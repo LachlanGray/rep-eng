@@ -3,9 +3,10 @@ import torch
 from transformers import AutoFeatureExtractor, AutoModel
 import os
 
+from config import DEVICE
+
 # Define your device (MPS for Apple Silicon, or "cuda" for GPU)
 HF_TOKEN = os.getenv("HF_TOKEN")
-DEVICE = "mps"
 
 
 def load_vision_model_and_feature_extractor(model_name: str, token):

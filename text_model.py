@@ -2,8 +2,9 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import os
 
+from config import DEVICE
+
 HF_TOKEN = os.getenv("HF_TOKEN")
-DEVICE = "mps"
 
 
 def load_model_and_tokenizer(model_name: str,token):
