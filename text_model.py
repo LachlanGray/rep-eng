@@ -10,22 +10,19 @@ def load_model_and_tokenizer(model_name: str,token):
     """
     Loads model and tokenizer.
     """
-    print(f"Starting to load model: {model_name}")
     device = torch.device(DEVICE)
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
-    print("Tokenizer loaded.")
 
     # Load model
-    print("Starting to load model...")
     model = AutoModelForCausalLM.from_pretrained(
             model_name,
             token=token,
             torch_dtype=torch.bfloat16,  # Use half precision
             device_map=device,  # Automatically choose the best device
         )
-    print("Model loaded successfully.")
+    print(f"Loaded {model_name}")
 
     tokenizer.pad_token = tokenizer.eos_token
     return model, tokenizer
@@ -33,9 +30,10 @@ def load_model_and_tokenizer(model_name: str,token):
 
 def meanpool_encode(text, model_str):
     model, tokenizer = load_model_and_tokenizer(model_str, HF_TOKEN)
+    device = torch.device(DEVICE)
     model.to(device)
 
-    input_tokens = tokenizer(input_text, return_tensors="pt", padding=True)
+    input_tokens = tokenizer(text, return_tensors="pt", padding=True)
     input_tokens = {k: v.to(device) for k, v in input_tokens.items()}
 
     with torch.no_grad():

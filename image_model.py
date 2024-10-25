@@ -32,32 +32,29 @@ def load_vision_model_and_feature_extractor(model_name: str, token):
     return model, feature_extractor
 
 
-def meanpool_encode(image_path, model_str):
-    """
-    Loads an image from a path using cv2, processes it, and returns the encoding.
-    """
-    # Load the image using OpenCV
-    image = cv2.imread(image_path)
-    image= cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+def encode_images(model_name: str, token: str, image_list: list):
 
     # Load model and feature extractor
-    model, feature_extractor = load_vision_model_and_feature_extractor(model_str, HF_TOKEN)
-    model.to(DEVICE)
+    model, feature_extractor = load_vision_model_and_feature_extractor(model_name, token)
 
-    # Preprocess the image using the feature extractor
-    inputs = feature_extractor(images=image, return_tensors="pt")
-    inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
+    model.eval()
 
-    with torch.no_grad():
-        outputs = model(**inputs, output_hidden_states=True)
+    embeddings = []
 
-    # Get the encoding from the last hidden state
-    encoding = outputs.hidden_states[-1]
+    for image in image_list:
 
-    # Mean pool the encoding to get a fixed-size vector
-    meanpool = torch.mean(encoding, dim=1)
+        if isinstance(image, str):
+            image = cv2.imread(image)
+            image= cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    return meanpool
+        inputs = feature_extractor(images=image, return_tensors="pt").to(model.device)
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+            embedding = outputs.last_hidden_state[:, 0, :]  # Example: taking the mean of hidden states
+            embeddings.append(embedding)
+
+    return embeddings
 
 
 if __name__ == "__main__":
@@ -66,6 +63,6 @@ if __name__ == "__main__":
     device = torch.device(DEVICE)
 
     img_path = "dog.jpg"
-    enc = meanpool_encode(img_path, model_str)
+    enc = encode_images([img_path], model_str)
 
     breakpoint()
