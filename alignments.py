@@ -7,7 +7,7 @@ import os
 def get_hash(x):
     return hashlib.md5(x.encode()).hexdigest()
 
-def compute_nearest_neighbors(feats, topk=1):
+def cosine_nearest_neighbors(feats, topk=1):
     assert feats.ndim == 2, f"Expected feats to be 2D, got {feats.ndim}"
     feats = feats / feats.norm(dim=1, keepdim=True)
     knn = (
@@ -18,17 +18,26 @@ def compute_nearest_neighbors(feats, topk=1):
 
 class TextAlignment:
     """
-    Calculate alignments between 
+    Embedding alignments for text models
     """
-    def __init__(self, models:list[str], sequences:list[str]):
+    def __init__(self, models:list[str], sequences:list[str], topk:int=10):
+        """
+        Args:
+            models: list of hf models
+            sequences: list of prompt strings to encode
+            topk: number of nearest neighbors to compute
+        """
+        self.models = models
+        self.topk=topk
 
         cache_dir = "cache"
         os.makedirs(cache_dir, exist_ok=True)
         seqs_id = str(get_hash("".join(sequences)))
 
         self.encodings = {}
+        self.sims = {}
 
-        for model in models:
+        for model in self.models:
             print(f"Starting {model}")
             cache_pth = os.path.join(cache_dir, f"{model.split('/')[-1]}_{seqs_id}.pth")
             if os.path.exists(cache_pth):
@@ -42,13 +51,37 @@ class TextAlignment:
             print("done")
 
 
-    def similarities(self, kernel_fn=compute_nearest_neighbors):
-        sims = {}
+    def compute_similarities(self, kernel_fn="cosine"):
+        assert kernel_fn in ["cosine"]
+
+        if kernel_fn == "cosine":
+            kernel_fn = lambda x: cosine_nearest_neighbors(x, topk=self.topk)
+
+        self.sims = {}
         for model, encs in self.encodings.items():
-            sims[model] = kernel_fn(encs, topk=15)
+            self.sims[model] = kernel_fn(encs)
 
-        return sims
+        return self.sims
 
+    def alignment_matrix(self):
+        assert self.sims is not None, "call compute_similarities() first"
+
+        n_models = len(self.models)
+        alignments = torch.zeros([n_models, n_models])
+
+        for i in range(n_models):
+            model_i = self.models[i]
+            for j in range(i+1, n_models):
+                model_j = self.models[j]
+
+                sims_i = self.sims[model_i]
+                sims_j = self.sims[model_j]
+
+                overlaps = [len(set(x.tolist()) & set(y.tolist())) for x, y in zip(sims_i, sims_j)]
+
+                alignments[i,j] = sum(overlaps) / len(overlaps) / self.topk
+
+        return alignments + alignments.T
 
 
 if __name__ == "__main__":
@@ -60,6 +93,7 @@ if __name__ == "__main__":
     questions, _ = dataset.get_arc()
 
     alignment = TextAlignment(models, questions)
-    sims = alignment.similarities()
+    _ = alignment.compute_similarities()
+    m = alignment.alignment_matrix()
     breakpoint()
 
