@@ -20,7 +20,7 @@ class TextAlignment:
     """
     Embedding alignments for text models
     """
-    def __init__(self, models:list[str], sequences:list[str], topk:int=10):
+    def __init__(self, models:list[str], sequences:list[str]):
         """
         Args:
             models: list of hf models
@@ -28,7 +28,6 @@ class TextAlignment:
             topk: number of nearest neighbors to compute
         """
         self.models = models
-        self.topk=topk
 
         cache_dir = "cache"
         os.makedirs(cache_dir, exist_ok=True)
@@ -51,11 +50,11 @@ class TextAlignment:
             print("done")
 
 
-    def compute_similarities(self, kernel_fn="cosine"):
+    def compute_similarities(self, kernel_fn="cosine", topk=10):
         assert kernel_fn in ["cosine"]
 
         if kernel_fn == "cosine":
-            kernel_fn = lambda x: cosine_nearest_neighbors(x, topk=self.topk)
+            kernel_fn = lambda x: cosine_nearest_neighbors(x, topk=topk)
 
         self.sims = {}
         for model, encs in self.encodings.items():
@@ -63,8 +62,9 @@ class TextAlignment:
 
         return self.sims
 
-    def alignment_matrix(self):
-        assert self.sims is not None, "call compute_similarities() first"
+    def alignment_matrix(self, kernel_fn="cosine", topk=10):
+        if self.sims == {}:
+            self.compute_similarities(kernel_fn, topk)
 
         n_models = len(self.models)
         alignments = torch.zeros([n_models, n_models])
@@ -79,7 +79,7 @@ class TextAlignment:
 
                 overlaps = [len(set(x.tolist()) & set(y.tolist())) for x, y in zip(sims_i, sims_j)]
 
-                alignments[i,j] = sum(overlaps) / len(overlaps) / self.topk
+                alignments[i,j] = sum(overlaps) / len(overlaps) / topk
 
         return alignments + alignments.T
 

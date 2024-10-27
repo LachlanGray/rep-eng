@@ -7,19 +7,19 @@ from config import DEVICE
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 
-def load_model_and_tokenizer(model_name: str,token):
+def load_model_and_tokenizer(model_name: str):
     """
     Loads model and tokenizer.
     """
     device = torch.device(DEVICE)
 
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, token=HF_TOKEN)
 
     # Load model
     model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            token=token,
+            token=HF_TOKEN,
             torch_dtype=torch.bfloat16,  # Use half precision
             device_map=device,  # Automatically choose the best device
         )
@@ -29,8 +29,8 @@ def load_model_and_tokenizer(model_name: str,token):
     return model, tokenizer
 
 
-def meanpool_encode(text, model_str):
-    model, tokenizer = load_model_and_tokenizer(model_str, HF_TOKEN)
+def meanpool_encode(text:list[str], model_str:str):
+    model, tokenizer = load_model_and_tokenizer(model_str)
     device = torch.device(DEVICE)
     model.to(device)
 

@@ -3,3 +3,4 @@ transformers
 opencv-python
 datasets
 accelerate
+matplotlib
