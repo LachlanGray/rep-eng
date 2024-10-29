@@ -1,6 +1,11 @@
 torch
+torchvision
 transformers
 opencv-python
 datasets
 accelerate
 matplotlib
+pillow
+beautifulsoup4
+requests
+flash-attn==1.0.5

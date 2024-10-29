@@ -1,8 +1,13 @@
 import torch
 import text_model
+import image_model
 import dataset
 import hashlib
 import os
+
+from numpy.typing import ArrayLike
+
+CACHE_DIR = "cache"
 
 def get_hash(x):
     return hashlib.md5(x.encode()).hexdigest()
@@ -16,39 +21,10 @@ def cosine_nearest_neighbors(feats, topk=1):
     return knn
 
 
-class TextAlignment:
-    """
-    Embedding alignments for text models
-    """
-    def __init__(self, models:list[str], sequences:list[str]):
-        """
-        Args:
-            models: list of hf models
-            sequences: list of prompt strings to encode
-            topk: number of nearest neighbors to compute
-        """
-        self.models = models
-
-        cache_dir = "cache"
-        os.makedirs(cache_dir, exist_ok=True)
-        seqs_id = str(get_hash("".join(sequences)))
-
-        self.encodings = {}
-        self.sims = {}
-
-        for model in self.models:
-            print(f"Starting {model}")
-            cache_pth = os.path.join(cache_dir, f"{model.split('/')[-1]}_{seqs_id}.pth")
-            if os.path.exists(cache_pth):
-                self.encodings[model] = torch.load(cache_pth)
-                continue
-
-            encs = text_model.meanpool_encode(sequences, model)
-            self.encodings[model] = encs
-
-            torch.save(encs, cache_pth)
-            print("done")
-
+class Alignment:
+    def __post_init__(self):
+        assert self.sims
+        assert self.encodings
 
     def compute_similarities(self, kernel_fn="cosine", topk=10):
         assert kernel_fn in ["cosine"]
@@ -108,6 +84,62 @@ class TextAlignment:
                 alignments[i,j] = sum(overlaps) / len(overlaps) / topk
 
         return alignments
+
+
+class TextAlignment(Alignment):
+    """
+    Embedding alignments for text models
+    """
+    def __init__(self, models:list[str], sequences:list[str]):
+        """
+        Args:
+            models: list of hf models
+            sequences: list of prompt strings to encode
+        """
+        self.models = models
+
+        cache_dir = CACHE_DIR
+        os.makedirs(cache_dir, exist_ok=True)
+        seqs_id = str(get_hash("".join(sequences)))
+
+        self.encodings = {}
+        self.sims = {}
+
+        for model in self.models:
+            print(f"Starting {model}")
+            cache_pth = os.path.join(cache_dir, f"{model.split('/')[-1]}_{seqs_id}.pth")
+            if os.path.exists(cache_pth):
+                self.encodings[model] = torch.load(cache_pth)
+                continue
+
+            encs = text_model.meanpool_encode(sequences, model)
+            self.encodings[model] = encs
+
+            torch.save(encs, cache_pth)
+            print("done")
+
+
+class ImageAlignment(Alignment):
+    def __init__(self, models:list[str], image_paths:list[str]):
+        self.models = models
+        self.encodings = {}
+
+        cache_dir = CACHE_DIR
+        os.makedirs(cache_dir, exist_ok=True)
+        images_id = str(get_hash("".join(image_paths)))
+
+        for model in self.models:
+            print(f"Starting {model}")
+            cache_pth = os.path.join(cache_dir, f"{model.split('/')[-1]}_{images_id}.pth")
+            if os.path.exists(cache_pth):
+                self.encodings[model] = torch.load(cache_pth)
+                continue
+
+            encs = image_model.encode_images(model, image_paths)
+            self.encodings[model] = encs
+
+            torch.save(encs, cache_pth)
+            print("done")
 
 
 if __name__ == "__main__":
