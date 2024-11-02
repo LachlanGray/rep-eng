@@ -13,7 +13,7 @@ def load_model_and_tokenizer(model_name: str):
 
     model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype="auto",
+            torch_dtype="auto", # TODO: generation
         )
     print(f"Loaded {model_name}")
 
@@ -46,4 +46,25 @@ def get_submodule(model, key):
 
     return sub_module
 
+def replace_submodule(model, key, new_module):
+    keys = key.split(".")
+    sub_module = model
+    for k in keys[:-1]:  # Traverse until the second-to-last key
+        if hasattr(sub_module, k):
+            sub_module = getattr(sub_module, k)
+        elif isinstance(sub_module, nn.ModuleList) or isinstance(sub_module, nn.ModuleDict):
+            try:
+                k_index = int(k)
+                sub_module = sub_module[k_index]
+            except ValueError:
+                sub_module = sub_module[k]
+        else:
+            raise KeyError(f"Key part '{k}' not found in model.")
+
+    # Replace the submodule
+    last_key = keys[-1]
+    if isinstance(sub_module, nn.ModuleList) or isinstance(sub_module, nn.ModuleDict):
+        sub_module[int(last_key) if last_key.isdigit() else last_key] = new_module
+    else:
+        setattr(sub_module, last_key, new_module)
 
